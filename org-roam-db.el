@@ -480,7 +480,7 @@ connections, nil is returned."
 (defun org-roam-db-build-cache (&optional force)
   "Build the cache for `org-roam-directory'.
 If FORCE, force a rebuild of the cache from scratch."
-      (progn (shell-command "bb /Users/laurentcharignon/repos/org-roam/test.clj")
+      (progn (shell-command (format "bb /Users/laurentcharignon/repos/org-roam/test.clj %s/" (expand-file org-roam-directory)))
           (org-roam-message "Done importing to DB from scratch!")))
 
 (provide 'org-roam-db)

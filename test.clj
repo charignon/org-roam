@@ -31,10 +31,7 @@
   (let [t2 (list (bit-shift-right t 16) (bit-and t 0xFFFF) 0 0)]
     (pr-str (list :atime t2 :mtime t2))))
 
-(def roam-dir "/Users/laurentcharignon/.roam/")
-(def roam-db-path "/Users/laurentcharignon/.roam/org-roam.db")
-
-(defn in-mem-db [] (->> (file-seq  (io/file roam-dir))
+(defn in-mem-db [roam-dir] (->> (file-seq  (io/file roam-dir))
               (pmap #(let [fname (.getAbsolutePath %1)]
                        (when (str/ends-with? fname ".org")
                          (let [c (slurp fname)
@@ -51,8 +48,6 @@
   (with-open [writer (io/writer title)]
           (csv/write-csv writer (doall (f)))))
 
-(def db (doall (in-mem-db)))
-
 (defn titles-db [db]
   (for [e db
         t (cons (:title e) (:alias e))]
@@ -62,7 +57,7 @@
   (map (juxt :fname :hash :meta) db))
 
 
-(defn links-db [db]
+(defn links-db [roam-dir db]
   (for [e db
         l (:links e)]
     [(:fname e) (pr-str (format "%s%s" roam-dir (first l))) (pr-str "file") (to-link-storage l)]))
@@ -80,11 +75,15 @@ PRAGMA user_version = 7;
 .import /tmp/links.csv links
 .import /tmp/titles.csv titles")
 
-(pmap
- #(apply write-csv %1)
- [["/tmp/titles.csv" #(titles-db db)]
-  ["/tmp/links.csv" #(links-db db)]
-  ["/tmp/files.csv" #(files-db db)]])
-(sh "rm" roam-db-path)
-(sh "sqlite3" roam-db-path :in db-init-str)
-(println (format "DONE imporing %d files" (count db)))
+(time
+ (let [roam-dir (first *command-line-args*)
+       roam-db-path (format "%sorg-roam.db" roam-dir)
+       db (in-mem-db roam-dir)]
+   (doall (pmap
+           #(apply write-csv %1)
+           [["/tmp/titles.csv" #(titles-db db)]
+            ["/tmp/links.csv" #(links-db roam-dir db)]
+            ["/tmp/files.csv" #(files-db db)]]))
+   (sh "rm" roam-db-path)
+   (sh "sqlite3" roam-db-path :in db-init-str)
+   (println (format "DONE importing %d files" (count db)))))

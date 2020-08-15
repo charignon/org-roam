@@ -477,14 +477,15 @@ connections, nil is returned."
              (org-roam-db--update-headlines))
            (org-roam-db--update-links)))
         (org-roam-buffer--update-maybe :redisplay t)))))
+
 (defun org-roam-db-build-cache (&optional force)
   "Build the cache for `org-roam-directory'.
 If FORCE, force a rebuild of the cache from scratch."
   (interactive "P")
-  (progn (shell-command (format "bb /Users/laurentcharignon/repos/org-roam/test.clj %s/" (expand-file-name org-roam-directory)))
-         (org-roam-message "Done importing to DB from scratch!")
-         (org-roam-db--close)))
-
+  (let* ((dir (file-name-directory (file-truename (locate-library "org-roam.el" t))))
+         (script-name (f-join dir "build-db.clj")))
+    (shell-command-to-string (format "bb %s %s/" script-name (expand-file-name org-roam-directory)))
+    (org-roam-message "Done importing to DB from scratch!")
+    (org-roam-db--close)))
 (provide 'org-roam-db)
-
 ;;; org-roam-db.el ends here

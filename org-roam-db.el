@@ -477,89 +477,11 @@ connections, nil is returned."
              (org-roam-db--update-headlines))
            (org-roam-db--update-links)))
         (org-roam-buffer--update-maybe :redisplay t)))))
-
 (defun org-roam-db-build-cache (&optional force)
   "Build the cache for `org-roam-directory'.
 If FORCE, force a rebuild of the cache from scratch."
-  (interactive "P")
-  (when force (delete-file (org-roam-db--get)))
-  (org-roam-db--close) ;; Force a reconnect
-  (org-roam-db) ;; To initialize the database, no-op if already initialized
-  (let* ((gc-cons-threshold org-roam-db-gc-threshold)
-         (org-roam-files (org-roam--list-all-files))
-         (current-files (org-roam-db--get-current-files))
-         (file-count 0)
-         (headline-count 0)
-         (link-count 0)
-         (tag-count 0)
-         (title-count 0)
-         (ref-count 0)
-         (deleted-count 0))
-    (emacsql-with-transaction (org-roam-db)
-      ;; Two-step building
-      ;; First step: Rebuild files and headlines
-      (dolist (file org-roam-files)
-        (let* ((attr (file-attributes file))
-               (atime (file-attribute-access-time attr))
-               (mtime (file-attribute-modification-time attr)))
-          (let ((contents-hash (org-roam-db--file-hash file)))
-            (unless (string= (gethash file current-files)
-                             contents-hash)
-              (condition-case nil
-                  (org-roam--with-temp-buffer file
-                    (org-roam-db--clear-file file)
-                    (org-roam-db-query
-                     [:insert :into files
-                      :values $v1]
-                     (vector file contents-hash (list :atime atime :mtime mtime)))
-                    (setq file-count (1+ file-count))
-                    (when org-roam-enable-headline-linking
-                      (when-let ((headlines (org-roam--extract-headlines file)))
-                        (when (org-roam-db--insert-headlines headlines)
-                          (setq headline-count (1+ headline-count))))))
-                (file-error
-                 (setq org-roam-files (remove file org-roam-files))
-                 (org-roam-db--clear-file file)
-                 (lwarn '(org-roam) :warning
-                        "Skipping unreadable file while building cache: %s" file)))))))
-      ;; Second step: Rebuild the rest
-      (dolist (file org-roam-files)
-        (let ((contents-hash (org-roam-db--file-hash file)))
-          (unless (string= (gethash file current-files)
-                           contents-hash)
-            (org-roam--with-temp-buffer file
-             (when-let (links (org-roam--extract-links file))
-               (org-roam-db-query
-                [:insert :into links
-                 :values $v1]
-                links)
-               (setq link-count (1+ link-count)))
-             (when-let (tags (org-roam--extract-tags file))
-               (org-roam-db-query
-                [:insert :into tags
-                 :values $v1]
-                (vector file tags))
-               (setq tag-count (1+ tag-count)))
-             (let ((titles (or (org-roam--extract-titles)
-                               (list (org-roam--path-to-slug file)))))
-               (org-roam-db--insert-titles file titles)
-               (setq title-count (+ title-count (length titles))))
-             (when-let* ((ref (org-roam--extract-ref)))
-               (when (org-roam-db--insert-ref file ref)
-                 (setq ref-count (1+ ref-count))))))
-          (remhash file current-files)))
-      (dolist (file (hash-table-keys current-files))
-        ;; These files are no longer around, remove from cache...
-        (org-roam-db--clear-file file)
-        (setq deleted-count (1+ deleted-count))))
-    (org-roam-message "files: Δ%s, headlines: Δ%s, links: Δ%s, tags: Δ%s, titles: Δ%s, refs: Δ%s, deleted: Δ%s"
-                      file-count
-                      headline-count
-                      link-count
-                      tag-count
-                      title-count
-                      ref-count
-                      deleted-count)))
+      (progn (shell-command "bb /Users/laurentcharignon/repos/org-roam/test.clj")
+          (org-roam-message "Done importing to DB from scratch!")))
 
 (provide 'org-roam-db)
 
